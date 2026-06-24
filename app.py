@@ -1,159 +1,88 @@
-import streamlit as st
 import pandas as pd
 import numpy as np
-
-import matplotlib.pyplot as plt
-import seaborn as sns
-import plotly.express as px
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
 
-# Page Configuration
-st.set_page_config(
-    page_title="Heart Disease Predictor",
-    page_icon="❤️",
-    layout="wide"
-)
+# ==========================================
+# 1. LOADING THE DATASET
+# ==========================================
+# Replace 'heart_data.csv' with the actual path to your file
+try:
+    df = pd.read_csv('heart_data.csv')
+    print("Dataset loaded successfully!")
+except FileNotFoundError:
+    # Creating dummy data matching your columns just so the script can run seamlessly
+    print("Local file not found. Creating a placeholder dataframe for demonstration...")
+    columns = ['age', 'sex', 'cp', 'trestbps', 'chol', 'fbs', 'restecg', 'thalach', 'exang', 'oldpeak', 'slope', 'ca', 'thal', 'target']
+    dummy_data = np.random.randint(0, 2, size=(100, len(columns)))
+    df = pd.DataFrame(dummy_data, columns=columns)
 
-# Title
-st.title("❤️ Heart Disease Prediction System")
-st.markdown("### A Machine Learning Web App built with Streamlit")
+# Preview the first 5 rows
+print("\n--- Dataset Preview ---")
+print(df.head())
 
-# Sidebar
-st.sidebar.header("Navigation")
-page = st.sidebar.selectbox("Go to", ["🏠 Home", "📊 EDA", "🔮 Predict", "📈 Model Info"])
+# ==========================================
+# 2. SPLITTING DATA INTO FEATURES & TARGET
+# ==========================================
+# 'X' contains all independent variables (features)
+X = df.drop(columns=['target'])
 
-# Load or Create Dataset
-@st.cache_data
-def load_data(uploaded_file=None):
-    if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
-    else:
-        # Sample data (you can replace with your full dataset)
-        data = {
-            'age': [63, 37, 41, 56, 57],
-            'sex': [1, 1, 0, 1, 0],
-            'cp': [3, 2, 1, 1, 0],
-            'trestbps': [145, 130, 130, 120, 120],
-            'chol': [233, 250, 204, 236, 354],
-            'fbs': [1, 0, 0, 0, 0],
-            'restecg': [0, 1, 0, 1, 1],
-            'thalach': [150, 187, 172, 178, 163],
-            'exang': [0, 0, 0, 0, 1],
-            'oldpeak': [2.3, 3.5, 1.4, 0.8, 0.6],
-            'slope': [0, 2, 2, 2, 2],
-            'ca': [0, 0, 0, 0, 0],
-            'thal': [1, 2, 2, 2, 2],
-            'target': [1, 1, 1, 1, 1]
-        }
-        df = pd.DataFrame(data)
-    return df
+# 'y' contains the dependent variable we want to predict
+y = df['target']
 
-# Main Pages
-if page == "🏠 Home":
-    st.image("https://img.freepik.com/free-vector/heart-disease-concept-illustration_23-2148650787.jpg", width=300)
-    st.write("""
-    This application predicts whether a person has **heart disease** (Target = 1) or not (Target = 0) 
-    using Machine Learning.
-    """)
-    
-    uploaded_file = st.file_uploader("Upload your heart.csv dataset", type=["csv"])
-    df = load_data(uploaded_file)
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Total Records", len(df))
-    with col2:
-        st.metric("Heart Disease Cases", df['target'].sum())
-    with col3:
-        st.metric("Accuracy Potential", "85-92%")
+# Split into Training (80%) and Testing (20%) sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
-    st.dataframe(df.head(), use_container_width=True)
+print(f"\nTraining set size: {X_train.shape[0]} samples")
+print(f"Testing set size: {X_test.shape[0]} samples")
 
-elif page == "📊 EDA":
-    st.header("Exploratory Data Analysis")
-    df = load_data(st.file_uploader("Upload your dataset for EDA", type=["csv"]))
-    
-    tab1, tab2, tab3 = st.tabs(["Distribution", "Correlation", "Features vs Target"])
-    
-    with tab1:
-        fig = px.histogram(df, x='age', color='target', barmode='group', title="Age Distribution by Target")
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with tab2:
-        fig, ax = plt.subplots(figsize=(10, 8))
-        sns.heatmap(df.corr(), annot=True, cmap='coolwarm', ax=ax)
-        st.pyplot(fig)
-    
-    with tab3:
-        feature = st.selectbox("Select Feature", df.columns[:-1])
-        fig = px.box(df, x='target', y=feature, color='target', title=f"{feature} vs Target")
-        st.plotly_chart(fig, use_container_width=True)
+# ==========================================
+# 3. FEATURE SCALING
+# ==========================================
+# Features like 'chol' (cholesterol) and 'trestbps' (blood pressure) have much higher 
+# ranges than binary features like 'sex' or 'fbs'. We scale them so the model treats them fairly.
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 
-elif page == "🔮 Predict":
-    st.header("🔮 Predict Heart Disease Risk")
-    
-    st.subheader("Enter Patient Information")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        age = st.slider("Age", 20, 80, 55)
-        sex = st.selectbox("Sex", [0, 1], format_func=lambda x: "Female" if x == 0 else "Male")
-        cp = st.selectbox("Chest Pain Type", [0,1,2,3], 
-                         format_func=lambda x: ["Typical Angina", "Atypical Angina", "Non-anginal Pain", "Asymptomatic"][x])
-        trestbps = st.slider("Resting Blood Pressure (mm Hg)", 90, 200, 130)
-        chol = st.slider("Serum Cholesterol (mg/dl)", 100, 400, 250)
-        fbs = st.selectbox("Fasting Blood Sugar > 120 mg/dl", [0, 1])
-    
-    with col2:
-        restecg = st.selectbox("Resting ECG", [0,1,2])
-        thalach = st.slider("Maximum Heart Rate Achieved", 60, 200, 150)
-        exang = st.selectbox("Exercise Induced Angina", [0, 1])
-        oldpeak = st.slider("ST Depression Induced by Exercise", 0.0, 6.0, 1.0, 0.1)
-        slope = st.selectbox("Slope of Peak Exercise ST Segment", [0,1,2])
-        ca = st.slider("Number of Major Vessels (0-3)", 0, 3, 0)
-        thal = st.selectbox("Thalassemia", [0,1,2,3])
+# ==========================================
+# 4. TRAINING THE MODEL
+# ==========================================
+model = LogisticRegression(random_state=42)
+model.fit(X_train_scaled, y_train)
+print("\nModel training complete.")
 
-    # Prediction Button
-    if st.button("🚀 Predict Heart Disease", type="primary", use_container_width=True):
-        # Create input dataframe
-        input_data = pd.DataFrame({
-            'age': [age], 'sex': [sex], 'cp': [cp], 'trestbps': [trestbps], 'chol': [chol],
-            'fbs': [fbs], 'restecg': [restecg], 'thalach': [thalach], 'exang': [exang],
-            'oldpeak': [oldpeak], 'slope': [slope], 'ca': [ca], 'thal': [thal]
-        })
-        
-        # Load or train model
-        try:
-            model = joblib.load('heart_disease_model.pkl')
-        except:
-            st.warning("Model not found. Training a new one...")
-            df = load_data()
-            X = df.drop('target', axis=1)
-            y = df['target']
-            model = RandomForestClassifier(n_estimators=200, random_state=42)
-            model.fit(X, y)
-        
-        # Make prediction
-        prediction = model.predict(input_data)[0]
-        probability = model.predict_proba(input_data)[0][1]
-        
-        if prediction == 1:
-            st.error(f"⚠️ **High Risk of Heart Disease** ({probability:.1%} probability)")
-        else:
-            st.success(f"✅ **Low Risk** - No Heart Disease Detected ({(1-probability):.1%} probability)")
-        
-        # Progress bar
-        st.progress(probability)
-        st.write(f"Risk Probability: **{probability:.1%}**")
+# ==========================================
+# 5. EVALUATING THE MODEL
+# ==========================================
+y_pred = model.predict(X_test_scaled)
 
-elif page == "📈 Model Info":
-    st.header("Model Performance")
-    st.write("Random Forest Classifier is used (Best performing on this dataset)")
-    st.info("Typical Accuracy: **88% - 92%** on test data")
+print("\n--- Model Evaluation ---")
+print(f"Accuracy Score: {accuracy_score(y_test, y_pred):.2%}")
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
 
-st.sidebar.markdown("---")
-st.sidebar.info("Built with ❤️ using Streamlit")
+# ==========================================
+# 6. MAKING A PREDICTION ON NEW DATA
+# ==========================================
+print("\n--- Making a Prediction on a New Patient ---")
 
+# Let's create a hypothetical patient profile matching your exact columns:
+# age, sex, cp, trestbps, chol, fbs, restecg, thalach, exang, oldpeak, slope, ca, thal
+new_patient = np.array([[57, 1, 3, 145, 233, 1, 0, 150, 0, 2.3, 0, 0, 1]])
+
+# Crucial Step: Scale the new patient data using the *same* scaler we used for training
+new_patient_scaled = scaler.transform(new_patient)
+
+# Predict class (0 or 1)
+prediction = model.predict(new_patient_scaled)
+
+# Predict probability
+probability = model.predict_proba(new_patient_scaled)
+
+if prediction[0] == 1:
+    print(f"Result: High risk of heart disease (Probability: {probability[0][1]:.2%})")
+else:
+    print(f"Result: Low risk of heart disease (Probability: {probability[0][0]:.2%})")
