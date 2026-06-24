@@ -1,0 +1,49 @@
+import streamlit as st
+import os
+
+# Set page configuration
+st.set_page_config(page_title="Networking Lab", layout="wide")
+
+st.title("🌐 Cisco Packet Tracer Lab Repository")
+st.write("Welcome to the lab repository. Use the tabs below to download the activity and follow instructions.")
+
+# Create Streamlit Tabs
+tab1, tab2, tab3 = st.tabs(["📥 Download Lab", "📖 Instructions", "⚙️ Requirements"])
+
+# Define the path to your .pka file
+# Ensure this file is in the same repository folder on GitHub
+PKA_FILE_PATH = "exercise.pka" 
+
+with tab1:
+    st.header("Download the Packet Tracer Activity")
+    st.write("Click the button below to download the `.pka` file for this module.")
+    
+    # Check if the file exists locally/in the repo before showing download button
+    if os.path.exists(PKA_FILE_PATH):
+        with open(PKA_FILE_PATH, "rb") as file:
+            st.download_button(
+                label="⚡ Download Lab (.pka)",
+                data=file,
+                file_name=PKA_FILE_PATH,
+                mime="application/octet-stream"
+            )
+        st.success("File ready for download!")
+    else:
+        st.error(f"Error: `{PKA_FILE_PATH}` not found in the repository root. Please upload it to your GitHub repository.")
+
+with tab2:
+    st.header("Lab Instructions")
+    st.markdown("""
+    ### How to Complete this Lab:
+    1. **Download** the `.pka` file from the first tab.
+    2. **Open** Cisco Packet Tracer on your computer.
+    3. Click `File -> Open` and select the downloaded file.
+    4. Follow the **Instructions window** that automatically pops up inside Packet Tracer.
+    5. Complete the topology configurations until your **Completion score reaches 100%**.
+    """)
+
+with tab3:
+    st.header("System Requirements")
+    st.write("To run this file, make sure you have the correct software installed:")
+    st.info("🔹 **Cisco Packet Tracer (v8.0 or higher recommended)**")
+    st.write("You can download it for free by signing up at [Networking Academy](https://www.netacad.com/).")
